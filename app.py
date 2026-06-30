@@ -1,5 +1,11 @@
 import streamlit as st
-from fpdf import FPDF
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.pagesizes import A4
+from io import BytesIO
+
+pdfmetrics.registerFont(TTFont("Arabic", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
 
 def generate_questions(name, position, cv_text):
     base = [
@@ -19,85 +25,53 @@ def generate_questions(name, position, cv_text):
 
     return base + extra
 
-def build_pdf(candidate):
-    pdf = FPDF()
-    pdf.add_page()
+def build_pdf(name, position, questions):
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
 
-    pdf.add_font("DejaVu", "", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", uni=True)
-    pdf.set_font("DejaVu", "", 18)
+    pdf.setFont("Arabic", 18)
+    pdf.drawString(50, 800, f"أسئلة مقابلة – {name}")
 
-    pdf.set_text_color(30, 80, 200)
-    pdf.cell(0, 10, f"أسئلة مقابلة – {candidate['name']}", ln=True)
+    pdf.setFont("Arabic", 14)
+    pdf.drawString(50, 770, f"المسمى الوظيفي: {position}")
 
-    pdf.set_font("DejaVu", "", 15)
-    pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 10, f"المسمى الوظيفي: {candidate['position']}", ln=True)
+    pdf.setFont("Arabic", 16)
+    pdf.drawString(50, 740, "الأسئلة:")
 
-    pdf.ln(5)
+    y = 710
+    pdf.setFont("Arabic", 14)
+    for q in questions:
+        pdf.drawString(50, y, f"- {q}")
+        y -= 25
 
-    pdf.set_font("DejaVu", "", 16)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, "الأسئلة المولّدة:", ln=True)
-
-    pdf.set_font("DejaVu", "", 14)
-    for q in candidate["questions"]:
-        pdf.multi_cell(0, 10, f"- {q}")
-        pdf.ln(1)
-
-    pdf.ln(10)
-    pdf.set_font("DejaVu", "", 12)
-    pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 10, "تم توليد هذا الملف بواسطة Hirix AI", ln=True, align="C")
-
-    return pdf.output(dest="S").encode("utf-8")
-
+    pdf.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
 
 st.title("Hirix AI – مولّد أسئلة المقابلات")
 
-if "candidates" not in st.session_state:
-    st.session_state["candidates"] = []
+name = st.text_input("اسم المرشح")
+position = st.text_input("المسمى الوظيفي")
+cv_file = st.file_uploader("ارفع الـ CV")
 
-if st.button("➕ إضافة مرشح"):
-    st.session_state["candidates"].append({
-        "name": "",
-        "position": "",
-        "cv_text": "",
-        "questions": []
-    })
+if st.button("توليد الأسئلة"):
+    if name and position and cv_file:
+        cv_text = "تم رفع السيرة الذاتية"
+        st.session_state["questions"] = generate_questions(name, position, cv_text)
+    else:
+        st.warning("أكمل البيانات قبل توليد الأسئلة.")
 
-for idx, c in enumerate(st.session_state["candidates"]):
-    st.markdown("---")
-    st.subheader(f"المرشح رقم {idx + 1}")
+if "questions" in st.session_state:
+    st.write("### الأسئلة:")
+    for q in st.session_state["questions"]:
+        st.write(f"- {q}")
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        c["name"] = st.text_input("اسم المرشح", key=f"name_{idx}")
-        c["position"] = st.text_input("المسمى الوظيفي", key=f"position_{idx}")
-        cv_file = st.file_uploader("ارفع الـ CV", key=f"cv_{idx}")
-
-        if cv_file:
-            c["cv_text"] = "تم رفع السيرة الذاتية"
-
-        if st.button("توليد الأسئلة", key=f"gen_{idx}"):
-            if c["name"] and c["position"] and c["cv_text"]:
-                c["questions"] = generate_questions(c["name"], c["position"], c["cv_text"])
-            else:
-                st.warning("أكمل البيانات قبل توليد الأسئلة.")
-
-    with col2:
-        st.markdown("#### الأسئلة")
-        if c["questions"]:
-            for q in c["questions"]:
-                st.markdown(f"- {q}")
-
-            if st.button("📄 تحميل PDF", key=f"pdf_{idx}"):
-                pdf_bytes = build_pdf(c)
-                st.download_button(
-                    "تحميل ملف PDF",
-                    pdf_bytes,
-                    file_name=f"{c['name']}_interview.pdf",
-                    mime="application/pdf"
-                )
-        else:
-            st.info("لم يتم توليد أسئلة بعد.")
+    if st.button("تحميل PDF"):
+        pdf_bytes = build_pdf(name, position, st.session_state["questions"])
+        st.download_button(
+            "تحميل ملف PDF",
+            pdf_bytes,
+            file_name=f"{name}_interview.pdf",
+            mime="application/pdf"
+        )
