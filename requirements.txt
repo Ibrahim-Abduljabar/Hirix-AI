@@ -1,7 +1,4 @@
 streamlit
-pdfplumber
-xhtml2pdf
-groq
-python-dotenv
-fpdf
-WeasyPrint==53.3
+fpdf2
+html2image
+Pillow
