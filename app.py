@@ -1,14 +1,9 @@
 import streamlit as st
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.pagesizes import A4
+from weasyprint import HTML
 from io import BytesIO
 
-pdfmetrics.registerFont(TTFont("Arabic", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
-
-def generate_questions(name, position, cv_text):
-    base = [
+def generate_questions(name, position):
+    return [
         f"احكي لنا عن خبرتك في مجال {position}.",
         "ما أصعب مشروع اشتغلت عليه وكيف تعاملت معه؟",
         "اذكر موقف واجهت فيه مشكلة كبيرة وكيف حلّيتها.",
@@ -17,50 +12,57 @@ def generate_questions(name, position, cv_text):
         "كيف تتعامل مع الضغط في بيئة العمل؟"
     ]
 
-    extra = []
-    if "Python" in cv_text:
-        extra.append("ذكرت أنك تجيد Python، ما آخر مشروع استخدمتها فيه؟")
-    if "Team" in cv_text or "فريق" in cv_text:
-        extra.append("احكي لنا عن تجربة عملك ضمن فريق.")
-
-    return base + extra
-
 def build_pdf(name, position, questions):
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
+    html = f"""
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{
+                font-family: 'Arial', sans-serif;
+                direction: rtl;
+                text-align: right;
+                padding: 40px;
+            }}
+            h1 {{
+                color: #1E50A2;
+            }}
+            h2 {{
+                color: #444;
+            }}
+            .question {{
+                margin-bottom: 12px;
+                font-size: 18px;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>أسئلة مقابلة – {name}</h1>
+        <h2>المسمى الوظيفي: {position}</h2>
+        <h2>الأسئلة:</h2>
+        {''.join([f"<div class='question'>- {q}</div>" for q in questions])}
+        <br><br>
+        <div style="text-align:center; color:#777;">
+            تم توليد هذا الملف بواسطة Hirix AI
+        </div>
+    </body>
+    </html>
+    """
 
-    pdf.setFont("Arabic", 18)
-    pdf.drawString(50, 800, f"أسئلة مقابلة – {name}")
-
-    pdf.setFont("Arabic", 14)
-    pdf.drawString(50, 770, f"المسمى الوظيفي: {position}")
-
-    pdf.setFont("Arabic", 16)
-    pdf.drawString(50, 740, "الأسئلة:")
-
-    y = 710
-    pdf.setFont("Arabic", 14)
-    for q in questions:
-        pdf.drawString(50, y, f"- {q}")
-        y -= 25
-
-    pdf.save()
-    pdf_bytes = buffer.getvalue()
-    buffer.close()
+    pdf_bytes = HTML(string=html).write_pdf()
     return pdf_bytes
 
 st.title("Hirix AI – مولّد أسئلة المقابلات")
 
 name = st.text_input("اسم المرشح")
 position = st.text_input("المسمى الوظيفي")
-cv_file = st.file_uploader("ارفع الـ CV")
+cv = st.file_uploader("ارفع الـ CV")
 
 if st.button("توليد الأسئلة"):
-    if name and position and cv_file:
-        cv_text = "تم رفع السيرة الذاتية"
-        st.session_state["questions"] = generate_questions(name, position, cv_text)
+    if name and position and cv:
+        st.session_state["questions"] = generate_questions(name, position)
     else:
-        st.warning("أكمل البيانات قبل توليد الأسئلة.")
+        st.warning("أكمل البيانات.")
 
 if "questions" in st.session_state:
     st.write("### الأسئلة:")
