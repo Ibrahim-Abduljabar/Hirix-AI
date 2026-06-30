@@ -1,6 +1,5 @@
-
+from fpdf import FPDF
 import streamlit as st
-from weasyprint import HTML
 from io import BytesIO
 
 def generate_questions(name, position, cv_text):
@@ -21,100 +20,41 @@ def generate_questions(name, position, cv_text):
 
     return base + extra
 
-def build_html(c):
-    return f"""
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <style>
-            @page {{
-                size: A4;
-                margin: 2cm;
-            }}
+def build_pdf(candidate):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
 
-            body {{
-                font-family: "Segoe UI", Tahoma, sans-serif;
-                background: #ffffff;
-                color: #222;
-            }}
+    pdf.set_font("Arial", "B", 18)
+    pdf.set_text_color(30, 80, 200)
+    pdf.cell(0, 10, f"أسئلة مقابلة – {candidate['name']}", ln=True)
 
-            .header {{
-                text-align: center;
-                margin-bottom: 30px;
-            }}
+    pdf.set_font("Arial", "", 14)
+    pdf.set_text_color(80, 80, 80)
+    pdf.cell(0, 10, f"المسمى الوظيفي: {candidate['position']}", ln=True)
 
-            .title {{
-                font-size: 28px;
-                font-weight: 700;
-                color: #1a73e8;
-                margin-bottom: 5px;
-            }}
+    pdf.ln(5)
 
-            .subtitle {{
-                font-size: 16px;
-                color: #555;
-            }}
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, "الأسئلة المولّدة:", ln=True)
 
-            .section {{
-                margin-top: 30px;
-                padding: 20px;
-                border-radius: 12px;
-                background: #f7f9fc;
-                border: 1px solid #e3e8ef;
-            }}
+    pdf.set_font("Arial", "", 13)
+    pdf.set_text_color(40, 40, 40)
 
-            .section h2 {{
-                font-size: 20px;
-                margin-bottom: 10px;
-                color: #333;
-            }}
+    for q in candidate["questions"]:
+        pdf.multi_cell(0, 8, f"- {q}")
+        pdf.ln(1)
 
-            ul {{
-                margin-top: 15px;
-                padding-left: 20px;
-            }}
+    pdf.ln(10)
+    pdf.set_font("Arial", "I", 11)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 10, "تم توليد هذا الملف بواسطة Hirix AI – HR Interview Generator", ln=True, align="C")
 
-            li {{
-                margin-bottom: 12px;
-                line-height: 1.6;
-                font-size: 15px;
-            }}
-
-            .footer {{
-                margin-top: 40px;
-                text-align: center;
-                font-size: 13px;
-                color: #777;
-            }}
-        </style>
-    </head>
-
-    <body>
-        <div class="header">
-            <div class="title">أسئلة مقابلة – {c['name']}</div>
-            <div class="subtitle">المسمى الوظيفي: {c['position']}</div>
-        </div>
-
-        <div class="section">
-            <h2>الأسئلة المولّدة</h2>
-            <ul>
-                {''.join(f'<li>{q}</li>' for q in c['questions'])}
-            </ul>
-        </div>
-
-        <div class="footer">
-            تم توليد هذا الملف بواسطة Hirix AI – HR Interview Generator
-        </div>
-    </body>
-    </html>
-    """
-
-def html_to_pdf(html):
-    pdf_bytes = HTML(string=html).write_pdf()
+    pdf_bytes = pdf.output(dest="S").encode("latin-1")
     return pdf_bytes
 
-st.set_page_config(page_title="Hirix HR Interview", layout="wide")
-st.title("Hirix AI – مولّد أسئلة المقابلات من الـ CV")
+st.title("Hirix AI – مولّد أسئلة المقابلات")
 
 if "candidates" not in st.session_state:
     st.session_state["candidates"] = []
@@ -129,7 +69,7 @@ if st.button("➕ إضافة مرشح جديد"):
 
 for idx, c in enumerate(st.session_state["candidates"]):
     st.markdown("---")
-    st.markdown(f"### المرشح رقم {idx + 1}")
+    st.subheader(f"المرشح رقم {idx + 1}")
 
     col1, col2 = st.columns(2)
 
@@ -157,11 +97,10 @@ for idx, c in enumerate(st.session_state["candidates"]):
                 st.markdown(f"- {q}")
 
             if st.button("📄 تحميل PDF", key=f"pdf_{idx}"):
-                html = build_html(c)
-                pdf = html_to_pdf(html)
+                pdf_bytes = build_pdf(c)
                 st.download_button(
                     "تحميل ملف PDF",
-                    pdf,
+                    pdf_bytes,
                     file_name=f"{c['name']}_interview.pdf",
                     mime="application/pdf"
                 )
