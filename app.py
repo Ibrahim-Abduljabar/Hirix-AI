@@ -74,7 +74,7 @@ for idx, c in enumerate(st.session_state["candidates"]):
         cv_file = st.file_uploader("Upload CV", key=f"cv_{idx}")
 
         if cv_file:
-            c["cv_text"] = cv_file.read().decode("utf-8")
+            c["cv_text"] = "PDF uploaded"
 
         if st.button("Generate Questions", key=f"gen_{idx}"):
             if c["name"] and c["position"] and c["cv_text"]:
