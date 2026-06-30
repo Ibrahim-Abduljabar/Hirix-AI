@@ -1,6 +1,6 @@
-from fpdf import FPDF
 import streamlit as st
-from io import BytesIO
+from fpdf import FPDF
+import os
 
 def generate_questions(name, position, cv_text):
     base = [
@@ -23,36 +23,34 @@ def generate_questions(name, position, cv_text):
 def build_pdf(candidate):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
 
-    pdf.set_font("Arial", "B", 18)
+    pdf.add_font("Amiri", "", "Amiri-Regular.ttf", uni=True)
+    pdf.set_font("Amiri", "", 18)
+
     pdf.set_text_color(30, 80, 200)
-    pdf.cell(0, 10, f"أسئلة مقابلة – {candidate['name']}", ln=True)
+    pdf.cell(0, 12, f"أسئلة مقابلة – {candidate['name']}", ln=True)
 
-    pdf.set_font("Arial", "", 14)
+    pdf.set_font("Amiri", "", 15)
     pdf.set_text_color(80, 80, 80)
     pdf.cell(0, 10, f"المسمى الوظيفي: {candidate['position']}", ln=True)
 
     pdf.ln(5)
 
-    pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Amiri", "", 16)
     pdf.cell(0, 10, "الأسئلة المولّدة:", ln=True)
 
-    pdf.set_font("Arial", "", 13)
-    pdf.set_text_color(40, 40, 40)
-
+    pdf.set_font("Amiri", "", 14)
     for q in candidate["questions"]:
-        pdf.multi_cell(0, 8, f"- {q}")
+        pdf.multi_cell(0, 10, f"- {q}")
         pdf.ln(1)
 
     pdf.ln(10)
-    pdf.set_font("Arial", "I", 11)
+    pdf.set_font("Amiri", "", 12)
     pdf.set_text_color(120, 120, 120)
     pdf.cell(0, 10, "تم توليد هذا الملف بواسطة Hirix AI – HR Interview Generator", ln=True, align="C")
 
-    pdf_bytes = pdf.output(dest="S").encode("latin-1")
-    return pdf_bytes
+    return pdf.output(dest="S").encode("utf-8")
 
 st.title("Hirix AI – مولّد أسئلة المقابلات")
 
