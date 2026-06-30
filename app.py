@@ -1,95 +1,120 @@
 
 import streamlit as st
+from weasyprint import HTML
 from io import BytesIO
-from xhtml2pdf import pisa
-import requests
-import json
 
-
-def generate_questions(candidate_name: str, position: str, cv_text: str):
-
-    base_questions = [
+def generate_questions(name, position, cv_text):
+    base = [
         f"احكي لنا عن خبرتك في مجال {position}.",
         "ما أصعب مشروع اشتغلت عليه وكيف تعاملت معه؟",
         "اذكر موقف واجهت فيه مشكلة كبيرة وكيف حلّيتها.",
         "ما المهارة اللي تحس أنك متميز فيها عن غيرك؟",
-        "ما أكثر إنجاز تفتخر فيه في مسيرتك المهنية؟",
-        "كيف تتعامل مع الضغط في بيئة العمل؟",
+        "ما أكثر إنجاز تفتخر فيه؟",
+        "كيف تتعامل مع الضغط في بيئة العمل؟"
     ]
 
     extra = []
     if "Python" in cv_text:
         extra.append("ذكرت أنك تجيد Python، ما آخر مشروع استخدمتها فيه؟")
     if "Team" in cv_text or "فريق" in cv_text:
-        extra.append("احكي لنا عن تجربة عملك ضمن فريق، وما دورك بالتحديد؟")
+        extra.append("احكي لنا عن تجربة عملك ضمن فريق.")
 
-    return base_questions + extra
+    return base + extra
 
-def build_html(candidate):
+def build_html(c):
     return f"""
     <html>
     <head>
         <meta charset="utf-8" />
         <style>
+            @page {{
+                size: A4;
+                margin: 2cm;
+            }}
+
             body {{
-                font-family: Tahoma, Arial, sans-serif;
-                background: #f5f5f5;
-                padding: 40px;
-            }}
-            .card {{
+                font-family: "Segoe UI", Tahoma, sans-serif;
                 background: #ffffff;
-                padding: 30px;
-                border-radius: 14px;
-                box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-                max-width: 800px;
-                margin: 0 auto;
-            }}
-            h1 {{
-                margin-bottom: 5px;
-                font-size: 26px;
                 color: #222;
             }}
-            h2 {{
-                margin-top: 0;
-                font-size: 18px;
-                color: #666;
+
+            .header {{
+                text-align: center;
+                margin-bottom: 30px;
             }}
-            .meta {{
-                margin-top: 8px;
-                font-size: 13px;
-                color: #999;
+
+            .title {{
+                font-size: 28px;
+                font-weight: 700;
+                color: #1a73e8;
+                margin-bottom: 5px;
             }}
-            ul {{
-                margin-top: 20px;
-                padding-left: 22px;
+
+            .subtitle {{
+                font-size: 16px;
+                color: #555;
             }}
-            li {{
+
+            .section {{
+                margin-top: 30px;
+                padding: 20px;
+                border-radius: 12px;
+                background: #f7f9fc;
+                border: 1px solid #e3e8ef;
+            }}
+
+            .section h2 {{
+                font-size: 20px;
                 margin-bottom: 10px;
+                color: #333;
+            }}
+
+            ul {{
+                margin-top: 15px;
+                padding-left: 20px;
+            }}
+
+            li {{
+                margin-bottom: 12px;
                 line-height: 1.6;
-                font-size: 14px;
+                font-size: 15px;
+            }}
+
+            .footer {{
+                margin-top: 40px;
+                text-align: center;
+                font-size: 13px;
+                color: #777;
             }}
         </style>
     </head>
+
     <body>
-        <div class="card">
-            <h1>أسئلة مقابلة – {candidate['name']}</h1>
-            <h2>المسمى الوظيفي: {candidate['position']}</h2>
-            <div class="meta">تم توليد الأسئلة بواسطة Hirix AI – HR Interview Generator</div>
+        <div class="header">
+            <div class="title">أسئلة مقابلة – {c['name']}</div>
+            <div class="subtitle">المسمى الوظيفي: {c['position']}</div>
+        </div>
+
+        <div class="section">
+            <h2>الأسئلة المولّدة</h2>
             <ul>
-                {''.join(f'<li>{q}</li>' for q in candidate['questions'])}
+                {''.join(f'<li>{q}</li>' for q in c['questions'])}
             </ul>
+        </div>
+
+        <div class="footer">
+            تم توليد هذا الملف بواسطة Hirix AI – HR Interview Generator
         </div>
     </body>
     </html>
     """
 
-def html_to_pdf_bytes(html_content: str) -> bytes:
-    result = BytesIO()
-    pisa.CreatePDF(html_content, dest=result)
-    return result.getvalue()
+def html_to_pdf(html):
+    pdf_bytes = HTML(string=html).write_pdf()
+    return pdf_bytes
 
 st.set_page_config(page_title="Hirix HR Interview", layout="wide")
-st.title("Hirix AI – مولّد أسئلة المقابلات من الـ CV للـ HR")
+st.title("Hirix AI – مولّد أسئلة المقابلات من الـ CV")
 
 if "candidates" not in st.session_state:
     st.session_state["candidates"] = []
@@ -102,49 +127,43 @@ if st.button("➕ إضافة مرشح جديد"):
         "questions": []
     })
 
-for idx, candidate in enumerate(st.session_state["candidates"]):
-    st.markdown(f"---")
+for idx, c in enumerate(st.session_state["candidates"]):
+    st.markdown("---")
     st.markdown(f"### المرشح رقم {idx + 1}")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        candidate["name"] = st.text_input("اسم المرشح", key=f"name_{idx}")
-        candidate["position"] = st.text_input("المسمى الوظيفي", key=f"position_{idx}")
-        cv_file = st.file_uploader("ارفع الـ CV (PDF أو ملف نصي)", key=f"cv_{idx}")
+        c["name"] = st.text_input("اسم المرشح", key=f"name_{idx}")
+        c["position"] = st.text_input("المسمى الوظيفي", key=f"position_{idx}")
+        cv_file = st.file_uploader("ارفع الـ CV", key=f"cv_{idx}")
 
-        if cv_file is not None:
+        if cv_file:
             if cv_file.type == "application/pdf":
-                candidate["cv_text"] = "نص مستخرج من PDF (ركّب pdfplumber هنا)"
+                c["cv_text"] = "نص مستخرج من PDF (ركّب pdfplumber لو تبغى)"
             else:
-                candidate["cv_text"] = cv_file.read().decode("utf-8")
+                c["cv_text"] = cv_file.read().decode("utf-8")
 
-        if st.button("توليد أسئلة المقابلة", key=f"generate_{idx}"):
-            if candidate["name"] and candidate["position"] and candidate["cv_text"]:
-                candidate["questions"] = generate_questions(
-                    candidate["name"],
-                    candidate["position"],
-                    candidate["cv_text"]
-                )
+        if st.button("توليد أسئلة", key=f"gen_{idx}"):
+            if c["name"] and c["position"] and c["cv_text"]:
+                c["questions"] = generate_questions(c["name"], c["position"], c["cv_text"])
             else:
-                st.warning("أكمل الاسم، المسمى الوظيفي، والـ CV قبل توليد الأسئلة.")
+                st.warning("أكمل البيانات قبل توليد الأسئلة.")
 
     with col2:
-        st.markdown("#### الأسئلة المولّدة")
-        if candidate["questions"]:
-            for q in candidate["questions"]:
+        st.markdown("#### الأسئلة")
+        if c["questions"]:
+            for q in c["questions"]:
                 st.markdown(f"- {q}")
 
-            if st.button("📄 تحميل الأسئلة كـ PDF", key=f"pdf_{idx}"):
-                html = build_html(candidate)
-                pdf_bytes = html_to_pdf_bytes(html)
+            if st.button("📄 تحميل PDF", key=f"pdf_{idx}"):
+                html = build_html(c)
+                pdf = html_to_pdf(html)
                 st.download_button(
-                    label="تحميل ملف PDF",
-                    data=pdf_bytes,
-                    file_name=f"{candidate['name']}_interview_questions.pdf",
-                    mime="application/pdf",
-                    key=f"download_{idx}"
+                    "تحميل ملف PDF",
+                    pdf,
+                    file_name=f"{c['name']}_interview.pdf",
+                    mime="application/pdf"
                 )
         else:
-            st.info("لم يتم توليد أسئلة بعد لهذا المرشح.")
-
+            st.info("لم يتم توليد أسئلة بعد.")
