@@ -1,0 +1,6 @@
+streamlit
+pdfplumber
+xhtml2pdf
+groq
+python-dotenv
+fpdf
